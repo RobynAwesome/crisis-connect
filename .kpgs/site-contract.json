@@ -26,6 +26,7 @@
   },
   "truth": {
     "incident_data_mode": "demo-labelled",
+    "local_persistence": "indexeddb",
     "claim_rule": "No live incident, dispatch, or delivery claim without a linked evidence receipt."
   },
   "experience": {
