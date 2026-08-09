@@ -3,7 +3,7 @@
    Cache-first for shell, network-first for API, offline queue
    ═══════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION = 'cc-adaptive-v1';
+const CACHE_VERSION = 'cc-adaptive-v3';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const DATA_CACHE = `${CACHE_VERSION}-data`;
 
@@ -12,6 +12,9 @@ const SHELL_ASSETS = [
   '/index.html',
   '/index.css',
   '/app.js',
+  '/db.js',
+  '/offline.html',
+  '/404.html',
   '/manifest.json'
 ];
 
@@ -70,7 +73,7 @@ self.addEventListener('fetch', (event) => {
       .catch(() => {
         // Offline fallback for navigation
         if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
+          return caches.match('/offline.html').then(response => response || caches.match('/index.html'));
         }
       })
   );
