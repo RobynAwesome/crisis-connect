@@ -20,6 +20,14 @@ rewrite, or silently deploy it.
 | Snapshot commit | `1fa18d4f337b629a4b9d99e582ed09b84753e375` |
 | Snapshot date | 2026-08-09 |
 
+## Recovered Main Brain material
+
+Before demotion, the retained `Introduction-to-MCP/public/CrisisConnect/` copy
+was compared against the legacy snapshot. Its unique IndexedDB persistence layer,
+favicon assets, and image asset were incorporated here. The canonical repository
+therefore contains the stronger PWA implementation before the retained copy is
+treated as reference-only.
+
 ## Deployment boundary
 
 The live domain is intentionally unchanged by this migration. Before a Vercel
