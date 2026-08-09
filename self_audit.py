@@ -13,6 +13,7 @@ REQUIRED_FILES = (
     "index.html",
     "index.css",
     "app.js",
+    "db.js",
     "sw.js",
     "manifest.json",
     "offline.html",
@@ -80,12 +81,23 @@ def main() -> int:
 
     index = (ROOT / "index.html").read_text(encoding="utf-8") if (ROOT / "index.html").is_file() else ""
     app = (ROOT / "app.js").read_text(encoding="utf-8") if (ROOT / "app.js").is_file() else ""
+    worker = (ROOT / "sw.js").read_text(encoding="utf-8") if (ROOT / "sw.js").is_file() else ""
     checks.append(
         check(
             "pwa-shell-links",
-            all(token in index for token in ("index.css", "app.js", "manifest.json"))
+            all(token in index for token in ("index.css", "db.js", "app.js", "manifest.json"))
             and "serviceWorker.register('/sw.js')" in app,
             "The app shell declares CSS, JavaScript, manifest, and service-worker registration.",
+        )
+    )
+    checks.append(
+        check(
+            "local-first-persistence",
+            "CCDB.putIncident" in app
+            and "CCDB.enqueue" in app
+            and "CCDB.getAllIncidents" in app
+            and "'/db.js'" in worker,
+            "Reports, offline queue, incident restoration, and the service-worker shell use IndexedDB.",
         )
     )
 
