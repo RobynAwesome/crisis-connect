@@ -359,18 +359,32 @@
         synced: navigator.onLine
       };
 
+      // Persist locally before any network-dependent action.
+      state.incidents.unshift(report);
+      if (typeof CCDB !== 'undefined') {
+        CCDB.putIncident(report).catch(e => console.warn('[CCDB] put failed:', e));
+        CCDB.logEvidence({
+          incident_id: report.id,
+          gate: 'REPORT_SUBMITTED',
+          action: navigator.onLine ? 'ONLINE_SUBMIT' : 'OFFLINE_QUEUE',
+          verdict: 'POC',
+          detail: report.type + ' / ' + report.severity + ' @ ' + report.location,
+          reporter: report.contact || 'anonymous'
+        }).catch(e => console.warn('[CCDB] evidence log failed:', e));
+      }
+
       if (navigator.onLine) {
-        // Simulate API call
-        state.incidents.unshift(report);
         renderIncidents();
-        toast('Incident reported successfully', 'success');
+        toast('Incident reported + persisted locally', 'success');
       } else {
         // Queue for offline sync
         state.offlineQueue.push(report);
-        state.incidents.unshift(report);
+        if (typeof CCDB !== 'undefined') {
+          CCDB.enqueue(report).catch(e => console.warn('[CCDB] enqueue failed:', e));
+        }
         updateQueueBanner();
         renderIncidents();
-        toast('Report queued — will sync when online', 'warning');
+        toast('Report queued locally — will sync when online', 'warning');
 
         // Try background sync
         if ('serviceWorker' in navigator && 'SyncManager' in window) {
@@ -502,6 +516,9 @@
       // Simulate sync
       toast(`Syncing ${state.offlineQueue.length} items...`, 'info');
       setTimeout(() => {
+        if (typeof CCDB !== 'undefined') {
+          CCDB.clearQueue().catch(e => console.warn('[CCDB] queue clear failed:', e));
+        }
         state.offlineQueue = [];
         state.lastSync = new Date();
         updateQueueBanner();
@@ -525,28 +542,48 @@
   }
 
   /* ── INIT ───────────────────────────────────────────────── */
-  function init() {
+  async function init() {
     registerSW();
     initConnectivity();
     initRoleSelector();
     initUrgencySelector();
     detectDevice();
     initNavigation();
-    renderIncidents();
-    renderAdaptationStatus();
     initReportForm();
-    updateQueueBanner();
     updateSyncDisplay();
     initInstallPrompt();
     initForceSync();
     initClock();
-    updateStats();
     initUserMenu();  // ── USER DROP MENU ─────────────────────
+
+    // Restore the local-first ledger before rendering the operational board.
+    if (typeof CCDB !== 'undefined') {
+      try {
+        await CCDB.open();
+        await CCDB.seedIfEmpty(DEMO_INCIDENTS);
+        const storedIncidents = await CCDB.getAllIncidents();
+        if (storedIncidents && storedIncidents.length > 0) {
+          state.incidents = storedIncidents.sort((a, b) => {
+            const order = { critical: 0, high: 1, medium: 2, low: 3 };
+            return (order[a.severity] || 9) - (order[b.severity] || 9);
+          });
+        }
+        const queue = await CCDB.getQueue();
+        if (queue) state.offlineQueue = queue;
+      } catch (err) {
+        console.warn('[CrisisConnect] IndexedDB unavailable, using memory:', err);
+      }
+    }
+
+    renderIncidents();
+    renderAdaptationStatus();
+    updateQueueBanner();
+    updateStats();
 
     // Set initial role
     setRole('citizen', '👤', '👤 Citizen');
 
-    console.log('[CrisisConnect] Adaptive PWA initialized');
+    console.log('[CrisisConnect] Adaptive PWA initialized — local persistence active');
     console.log('[CrisisConnect] 6 dimensions active: connectivity, role, urgency, device, trust, local');
     console.log('[CrisisConnect] USER DROP MENU: active | IKP: CLEAN | 360DP: VIP ####!!!!');
   }
@@ -844,4 +881,3 @@
     init();
   }
 })();
-
