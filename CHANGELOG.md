@@ -5,6 +5,8 @@
 ### Changed
 - Separated the canonical CrisisConnect source into `RobynAwesome/crisis-connect`.
 - Recorded the legacy source snapshot and the KPGS source-ownership contract.
+- Recovered the Main Brain copy's IndexedDB persistence layer and retained assets
+  before demoting that copy to reference-only status.
 
 ### Governance
 - Added a repository-only KPGS gate. It verifies source identity, critical PWA
