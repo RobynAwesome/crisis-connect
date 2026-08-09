@@ -1,0 +1,21 @@
+name: KPGS CrisisConnect Source Gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  source-contract:
+    name: Verify source contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run KPGS repository audit
+        run: python self_audit.py
