@@ -1,0 +1,49 @@
+{
+  "schema": "kpgs_site_contract_v1",
+  "site_id": "crisisconnect",
+  "domain": "crisisconnect.kopanolabs.com",
+  "node": {
+    "sector_id": "sector_03_crisisconnect",
+    "codename": "CRISIS-C",
+    "swfus": "fire"
+  },
+  "source": {
+    "repository": "RobynAwesome/crisis-connect",
+    "branch": "main",
+    "path": ".",
+    "authority": "canonical",
+    "migration_origin": {
+      "repository": "Kopano-Labs/CrisisConnect",
+      "branch": "master",
+      "commit": "1fa18d4f337b629a4b9d99e582ed09b84753e375"
+    }
+  },
+  "deployment": {
+    "provider": "vercel",
+    "domain": "crisisconnect.kopanolabs.com",
+    "source_switch": "pending",
+    "live_domain_changed_by_this_contract": false
+  },
+  "truth": {
+    "incident_data_mode": "demo-labelled",
+    "claim_rule": "No live incident, dispatch, or delivery claim without a linked evidence receipt."
+  },
+  "experience": {
+    "mode": "critical-service",
+    "motion": "essential-only",
+    "forbidden": [
+      "autoplay-video",
+      "decorative-canvas",
+      "blocking-page-transition"
+    ],
+    "reduced_motion": "static",
+    "offline_fallback": "offline.html",
+    "not_found_fallback": "404.html"
+  },
+  "critical_flows": [
+    "incident-report",
+    "offline-queue",
+    "role-selection",
+    "urgency-selection"
+  ]
+}
