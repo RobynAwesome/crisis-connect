@@ -34,6 +34,11 @@ The live domain is intentionally unchanged by this migration. Before a Vercel
 source switch, KPGS requires a separate deployment receipt containing the target
 repository commit, deployment URL, live response check, and rollback point.
 
+**Observed live route (2026-08-10):** the public domain returned `HTTP 200`
+through Cloudflare with a Caddy upstream. This is evidence of the current route,
+not a claim that the Vercel target is serving production. The route must remain
+explicitly distinct until the source-switch receipt is recorded.
+
 ## Legacy-copy rule
 
 Historical copies are evidence or reference material only. They are not allowed
