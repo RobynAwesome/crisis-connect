@@ -22,6 +22,12 @@
     "provider": "vercel",
     "domain": "crisisconnect.kopanolabs.com",
     "source_switch": "pending",
+    "observed_live": {
+      "observed_at": "2026-08-10",
+      "edge": "cloudflare",
+      "upstream_hint": "caddy",
+      "status": 200
+    },
     "live_domain_changed_by_this_contract": false
   },
   "truth": {
