@@ -64,8 +64,20 @@ def main() -> int:
                 "domain-contract",
                 config.get("vercel_url") == "https://crisisconnect.kopanolabs.com"
                 and contract.get("domain") == "crisisconnect.kopanolabs.com"
-                and contract.get("deployment", {}).get("source_switch") == "pending",
-                "The domain is declared without falsely claiming that this migration deployed it.",
+                and contract.get("deployment", {}).get("provider") == "vercel"
+                and contract.get("deployment", {}).get("source_switch") == "pending"
+                and contract.get("deployment", {}).get("live_domain_changed_by_this_contract") is False,
+                "The Vercel target is declared without falsely claiming that this migration deployed it.",
+            )
+        )
+        observed = contract.get("deployment", {}).get("observed_live", {})
+        checks.append(
+            check(
+                "observed-live-route",
+                observed.get("edge") == "cloudflare"
+                and observed.get("upstream_hint") == "caddy"
+                and observed.get("status") == 200,
+                "The current Cloudflare-to-Caddy route is recorded separately from the intended Vercel target.",
             )
         )
         checks.append(
