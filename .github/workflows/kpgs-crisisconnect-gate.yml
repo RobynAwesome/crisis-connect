@@ -3,19 +3,37 @@ name: KPGS CrisisConnect Source Gate
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, feat/kpgs-vnext-apu-crud-swfus]
 
 permissions:
   contents: read
 
+concurrency:
+  group: crisisconnect-kpgs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   source-contract:
-    name: Verify source contract
+    name: Verify source + progressive contract
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: JavaScript syntax preflight
+        run: node --check kpgs_progressive.js && node --check db.js && node --check app.js && node --check sw.js
+
+      - name: Canonical APU → #NB → CRUD → SWFUS unit proof
+        run: node --test tests/kpgs_progressive.test.mjs
+
       - name: Run KPGS repository audit
         run: python self_audit.py
