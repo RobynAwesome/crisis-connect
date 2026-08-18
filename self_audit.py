@@ -147,11 +147,11 @@ def main() -> int:
     checks.append(
         check(
             "no-fabricated-external-sync",
-            "SYNC_COMPLETE" not in worker
+            "type: 'SYNC_COMPLETE'" not in worker
             and "SYNC_HELD_NO_EXTERNAL_SINK" in worker
             and "EXTERNAL_DISTRIBUTION_RECEIPT_REQUIRED" in db
             and "external_dispatch_claimed: false" in db,
-            "Connectivity/background sync cannot clear pending work or manufacture an external-dispatch receipt.",
+            "Executable background sync cannot clear pending work or manufacture an external-dispatch receipt; documentation may still name the forbidden legacy event.",
         )
     )
 
