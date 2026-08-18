@@ -19,6 +19,19 @@ const CCDB = (function () {
   };
 
   let _db = null;
+  let _progressiveRuntimePromise = null;
+
+  async function _ensureProgressiveRuntime() {
+    if (typeof KPGSProgressive !== 'undefined') return KPGSProgressive;
+    if (!_progressiveRuntimePromise) {
+      _progressiveRuntimePromise = import('./kpgs_progressive.js');
+    }
+    await _progressiveRuntimePromise;
+    if (typeof KPGSProgressive === 'undefined') {
+      throw new Error('KPGS progressive runtime failed to initialize');
+    }
+    return KPGSProgressive;
+  }
 
   function open() {
     return new Promise((resolve, reject) => {
@@ -126,9 +139,40 @@ const CCDB = (function () {
     return (hash >>> 0).toString(16).padStart(8, '0');
   }
 
-  async function putIncident(incident) {
+  async function _putIncidentLegacy(incident) {
     await open();
     return _promisify(_tx(STORES.INCIDENTS, 'readwrite').put(incident));
+  }
+
+  async function putIncident(incident) {
+    if (!incident || typeof incident !== 'object' || !incident.id) {
+      throw new Error('incident with stable id is required');
+    }
+    const runtime = await _ensureProgressiveRuntime();
+    incident.synced = false;
+    incident.local_swfus = false;
+    const update = runtime.createIncidentUpdate(incident, {
+      updateId: 'incident:create:' + incident.id,
+      idempotencyKey: 'incident:create:' + incident.id,
+      evidenceRef: 'report-form-valid:' + incident.id
+    });
+    const result = await executeProgressiveIncidentUpdate(update);
+    if (result.receipt.disposition !== 'APPLIED') {
+      throw new Error('incident persistence blocked: ' + result.receipt.disposition);
+    }
+    incident.local_swfus = true;
+    incident.swfus_receipt_id = result.receipt.receipt_id;
+
+    // Every real user report remains pending external distribution until an
+    // actual remote sink returns evidence. Network availability alone cannot
+    // erase that obligation.
+    await enqueue({
+      ...incident,
+      progressive_update: update,
+      local_swfus_receipt_id: result.receipt.receipt_id,
+      external_dispatch_status: 'PENDING'
+    });
+    return result;
   }
 
   async function getIncident(id) {
@@ -194,11 +238,8 @@ const CCDB = (function () {
 
   async function executeProgressiveIncidentUpdate(rawUpdate) {
     await open();
-    if (typeof KPGSProgressive === 'undefined') {
-      throw new Error('KPGS progressive runtime is not loaded');
-    }
-
-    const update = KPGSProgressive.normalize(rawUpdate);
+    const runtime = await _ensureProgressiveRuntime();
+    const update = runtime.normalize(rawUpdate);
     const priorReceipts = await getEvidenceByUpdateId(update.update_id);
     const replay = priorReceipts.find(entry => entry.swfus_receipt && entry.update_id === update.update_id);
     if (replay) {
@@ -211,7 +252,7 @@ const CCDB = (function () {
     }
 
     const currentProjection = await getProjection(update.node_id);
-    const evaluation = KPGSProgressive.evaluate(update, currentProjection);
+    const evaluation = runtime.evaluate(update, currentProjection);
     const finalReceipt = await _finalizeReceipt(evaluation);
     const distribution = evaluation.distribution
       ? { ...evaluation.distribution, state_digest: finalReceipt.state_digest }
@@ -265,10 +306,16 @@ const CCDB = (function () {
 
   async function enqueue(item) {
     await open();
-    return _promisify(_tx(STORES.QUEUE, 'readwrite').put(item));
+    if (!item || typeof item !== 'object' || !item.id) throw new Error('queued item requires stable id');
+    const existing = await _promisify(_tx(STORES.QUEUE, 'readonly').get(item.id));
+    const record = existing ? { ...item, ...existing } : item;
+    return _promisify(_tx(STORES.QUEUE, 'readwrite').put(record));
   }
 
-  async function dequeue(id) {
+  async function dequeue(id, externalReceipt) {
+    if (!externalReceipt || externalReceipt.external_dispatched !== true) {
+      throw new Error('EXTERNAL_DISTRIBUTION_RECEIPT_REQUIRED');
+    }
     await open();
     return _promisify(_tx(STORES.QUEUE, 'readwrite').delete(id));
   }
@@ -278,9 +325,14 @@ const CCDB = (function () {
     return _promisify(_tx(STORES.QUEUE, 'readonly').getAll());
   }
 
-  async function clearQueue() {
-    await open();
-    return _promisify(_tx(STORES.QUEUE, 'readwrite').clear());
+  function clearQueue(externalReceipt) {
+    if (!externalReceipt || externalReceipt.external_dispatched !== true) {
+      // Deliberately synchronous so legacy callers cannot continue to clear
+      // their in-memory queue and announce a fabricated success after catching
+      // an asynchronous rejection.
+      throw new Error('EXTERNAL_DISTRIBUTION_RECEIPT_REQUIRED');
+    }
+    return open().then(() => _promisify(_tx(STORES.QUEUE, 'readwrite').clear()));
   }
 
   async function queueSize() {
@@ -350,6 +402,7 @@ const CCDB = (function () {
   return {
     open,
     STORES,
+    _putIncidentLegacy,
     putIncident,
     getIncident,
     getAllIncidents,
