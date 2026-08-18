@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 
@@ -14,6 +13,7 @@ REQUIRED_FILES = (
     "index.css",
     "app.js",
     "db.js",
+    "kpgs_progressive.js",
     "sw.js",
     "manifest.json",
     "offline.html",
@@ -22,6 +22,7 @@ REQUIRED_FILES = (
     ".kpgs/site-contract.json",
     "MIGRATION.md",
     "vercel.json",
+    "tests/kpgs_progressive.test.mjs",
 )
 
 
@@ -39,7 +40,7 @@ def main() -> int:
         check(
             "required-files",
             all((ROOT / path).is_file() for path in REQUIRED_FILES),
-            "All required PWA, source-authority, and fallback files are present.",
+            "All required PWA, progressive-governance, source-authority, and fallback files are present.",
         )
     )
 
@@ -93,13 +94,21 @@ def main() -> int:
 
     index = (ROOT / "index.html").read_text(encoding="utf-8") if (ROOT / "index.html").is_file() else ""
     app = (ROOT / "app.js").read_text(encoding="utf-8") if (ROOT / "app.js").is_file() else ""
+    db = (ROOT / "db.js").read_text(encoding="utf-8") if (ROOT / "db.js").is_file() else ""
     worker = (ROOT / "sw.js").read_text(encoding="utf-8") if (ROOT / "sw.js").is_file() else ""
+    progressive = (
+        (ROOT / "kpgs_progressive.js").read_text(encoding="utf-8")
+        if (ROOT / "kpgs_progressive.js").is_file()
+        else ""
+    )
+
     checks.append(
         check(
             "pwa-shell-links",
             all(token in index for token in ("index.css", "db.js", "app.js", "manifest.json"))
-            and "serviceWorker.register('/sw.js')" in app,
-            "The app shell declares CSS, JavaScript, manifest, and service-worker registration.",
+            and "serviceWorker.register('/sw.js')" in app
+            and "'/kpgs_progressive.js'" in worker,
+            "The app shell and service worker retain required offline runtime surfaces, including the progressive engine.",
         )
     )
     checks.append(
@@ -108,17 +117,51 @@ def main() -> int:
             "CCDB.putIncident" in app
             and "CCDB.enqueue" in app
             and "CCDB.getAllIncidents" in app
-            and "'/db.js'" in worker,
-            "Reports, offline queue, incident restoration, and the service-worker shell use IndexedDB.",
+            and "executeProgressiveIncidentUpdate" in db
+            and "swfus_projections" in db,
+            "User report persistence routes through the local progressive projection path while existing restoration remains intact.",
+        )
+    )
+    checks.append(
+        check(
+            "canonical-progressive-membrane",
+            all(
+                token in progressive
+                for token in (
+                    "kpgs.progressive-update.v1",
+                    "#NB",
+                    "TELEMETRY",
+                    "CLASSIFICATION",
+                    "ROUTING",
+                    "PROTOCOL_SELECTION",
+                    "INVARIANT_AUDIT",
+                    "POC_FOC_CHECK",
+                    "STATE_UPDATE",
+                    "DISTRIBUTION",
+                    "transport_grants_authority: false",
+                )
+            ),
+            "The current Introduction-to-MCP stage order and non-authoritative distribution boundary are represented explicitly.",
+        )
+    )
+    checks.append(
+        check(
+            "no-fabricated-external-sync",
+            "type: 'SYNC_COMPLETE'" not in worker
+            and "SYNC_HELD_NO_EXTERNAL_SINK" in worker
+            and "EXTERNAL_DISTRIBUTION_RECEIPT_REQUIRED" in db
+            and "external_dispatch_claimed: false" in db,
+            "Executable background sync cannot clear pending work or manufacture an external-dispatch receipt; documentation may still name the forbidden legacy event.",
         )
     )
 
     passed = all(item["pass"] for item in checks)
     result = {
-        "schema": "crisisconnect_repo_audit_v1",
+        "schema": "crisisconnect_repo_audit_v2",
         "verdict": "PASS" if passed else "BLOCK",
-        "scope": "repository source and KPGS contract only",
+        "scope": "repository source, KPGS contract, local SWFUS projection, and anti-FOC sync boundary only",
         "live_domain_verification": "not_run",
+        "external_dispatch_verification": "not_run",
         "checks": checks,
     }
     print(json.dumps(result, indent=2))
